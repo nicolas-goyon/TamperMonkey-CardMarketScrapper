@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CardMarket Helper
 // @namespace    https://github.com/nicolas-goyon/TamperMonkey-CardMarketScrapper
-// @version      1.0.0
+// @version      2.0.1
 // @description  Wishlist exporter, offers scraper, shopping-cart exporter and cart filler for CardMarket (cardmarket_helper) — auto-updating, configured from its ⚙ Settings panel.
 // @author       nicolas-goyon
 // @homepageURL  https://github.com/nicolas-goyon/TamperMonkey-CardMarketScrapper

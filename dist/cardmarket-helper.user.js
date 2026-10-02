@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CardMarket Helper
 // @namespace    https://github.com/nicolas-goyon/TamperMonkey-CardMarketScrapper
-// @version      1.0.0
+// @version      2.0.1
 // @description  Wishlist exporter, offers scraper, shopping-cart exporter and cart filler for CardMarket (cardmarket_helper) — auto-updating, configured from its ⚙ Settings panel.
 // @author       nicolas-goyon
 // @homepageURL  https://github.com/nicolas-goyon/TamperMonkey-CardMarketScrapper
@@ -18,7 +18,7 @@
 // @downloadURL  https://github.com/nicolas-goyon/TamperMonkey-CardMarketScrapper/releases/latest/download/cardmarket-helper.user.js
 // ==/UserScript==
 
-/*! CardMarket Helper v1.0.0 — built file, do not edit — https://github.com/nicolas-goyon/TamperMonkey-CardMarketScrapper */
+/*! CardMarket Helper v2.0.1 — built file, do not edit — https://github.com/nicolas-goyon/TamperMonkey-CardMarketScrapper */
 "use strict";
 var CardmarketHelper = (() => {
   var __defProp = Object.defineProperty;
@@ -2443,7 +2443,7 @@ ${filename}`, { title: "Shopping cart exported" });
   }
 
   // src/index.ts
-  var version = "1.0.0";
+  var version = "2.0.1";
   var initialized = false;
   function init(userConfig = {}) {
     if (initialized) return;
