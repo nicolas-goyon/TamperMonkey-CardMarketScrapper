@@ -33,6 +33,7 @@ on:
       - 'package-lock.json'
       - 'tsconfig.json'
       - 'scripts/**'
+      - '.github/workflows/release.yml'
   pull_request:
     branches: [main]
   workflow_dispatch:
