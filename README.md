@@ -27,7 +27,7 @@ It installs and **updates itself** from this repository's GitHub releases. Every
   - then a **patch** bump by default, `[minor]` / `[major]` in a commit message for bigger bumps, `[skip release]` to publish nothing.
 - The version is stamped into the userscript header (`@version`), which is what Tampermonkey compares to decide to update.
 - A GitHub Release is created with `cardmarket-helper.user.js` (the script) and `cardmarket-helper.meta.js` (header only, polled by Tampermonkey) attached; it becomes the *latest* release that the install/update URLs point to. The tag also gets a CI-only commit containing `dist/`.
-- Pull requests to `main` are typechecked and built, nothing is published.
+- Every push, pull request and manual run goes through the `check` job (typecheck + build, Node 24); the `release` job runs after it, only for pushes to `main` and manual runs.
 - Manual run (Actions → *Run workflow*): cut a release with a chosen bump, or rebuild an existing tag in place.
 
 ## Develop

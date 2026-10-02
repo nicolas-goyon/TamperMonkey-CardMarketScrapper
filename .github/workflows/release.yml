@@ -59,27 +59,32 @@ env:
   META: dist/cardmarket-helper.meta.js
 
 jobs:
-  # Pull requests: typecheck + build only, nothing is published
+  # Typecheck + build on every push, pull request and manual run. Releases
+  # only happen when this passes (release: needs: check).
   check:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
-      - run: test -s "$BUNDLE" && test -s "$META"
+      - name: Verify the userscript
+        run: |
+          test -s "$BUNDLE" && test -s "$META"
+          grep -q "^// ==UserScript==" "$BUNDLE"
+          echo "OK: $BUNDLE ($(wc -c < "$BUNDLE") bytes)"
 
   release:
+    needs: check
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: true
@@ -150,9 +155,9 @@ jobs:
 
       - name: Setup Node
         if: steps.tag.outputs.skip != 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
