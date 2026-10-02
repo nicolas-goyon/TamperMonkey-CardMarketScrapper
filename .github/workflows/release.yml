@@ -1,8 +1,11 @@
 name: Build & publish bundle (jsDelivr)
 
-# Builds the Tampermonkey bundle and publishes it on a `vX.Y.Z` tag, so
-# jsDelivr serves a frozen artifact:
-#   https://cdn.jsdelivr.net/gh/<owner>/<repo>@vX.Y.Z/dist/cardmarket-helper.js
+# Builds the userscript and publishes it as a GitHub Release. Users install
+#   https://github.com/<owner>/<repo>/releases/latest/download/cardmarket-helper.user.js
+# once; its @updateURL (…/latest/download/cardmarket-helper.meta.js) lets
+# Tampermonkey detect every new release and update the script automatically.
+# The @version in the header is stamped from the release tag, so each release
+# must have a higher version than the previous one (the tag logic guarantees it).
 #
 # Release flow (fully automatic):
 #   1. Push to main touching src/, package.json/lock, tsconfig.json or scripts/.
@@ -12,10 +15,10 @@ name: Build & publish bundle (jsDelivr)
 #        - a pushed commit message contains "[minor]" -> minor bump
 #        - a pushed commit message contains "[major]" -> major bump ([major] wins)
 #        - a pushed commit message contains "[skip release]" -> no release
-#   2. CI typechecks, stamps the version into the bundle, builds, commits dist/
-#      onto a detached commit and pushes the tag pointing at it. main itself
-#      never carries build output (dist/ is git-ignored there).
-#   3. A GitHub Release with the bundle attached is created for the tag.
+#   2. CI typechecks, stamps the version, builds, commits dist/ onto a
+#      detached commit and pushes the tag pointing at it (main never gets it).
+#   3. A GitHub Release is created for the tag with cardmarket-helper.user.js
+#      and cardmarket-helper.meta.js attached — it becomes the "latest" release.
 #
 # Manual escape hatches (Actions tab → Run workflow):
 #   - "tag" empty, optional "bump"  -> cut a release like an automatic push
@@ -52,7 +55,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  BUNDLE: dist/cardmarket-helper.js
+  BUNDLE: dist/cardmarket-helper.user.js
+  META: dist/cardmarket-helper.meta.js
 
 jobs:
   # Pull requests: typecheck + build only, nothing is published
@@ -68,7 +72,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
-      - run: test -s "$BUNDLE"
+      - run: test -s "$BUNDLE" && test -s "$META"
 
   release:
     if: github.event_name != 'pull_request'
@@ -166,8 +170,11 @@ jobs:
         run: |
           npm version "${TAG#v}" --no-git-tag-version --allow-same-version
           npm run build
-          test -s "$BUNDLE" || { echo "::error::$BUNDLE missing or empty"; exit 1; }
-          grep -q "CardMarket Helper ${TAG}" "$BUNDLE" || { echo "::error::version banner missing in $BUNDLE"; exit 1; }
+          for f in "$BUNDLE" "$META"; do
+            test -s "$f" || { echo "::error::$f missing or empty"; exit 1; }
+            grep -qE "^// @version +${TAG#v}$" "$f" || { echo "::error::@version ${TAG#v} missing in $f"; exit 1; }
+          done
+          grep -q "^// @downloadURL .*/releases/latest/download/cardmarket-helper.user.js$" "$BUNDLE" || { echo "::error::@downloadURL missing"; exit 1; }
           echo "OK: $BUNDLE ($(wc -c < "$BUNDLE") bytes)"
 
       - name: Commit dist/ and push the tag
@@ -193,10 +200,10 @@ jobs:
           TAG: ${{ steps.tag.outputs.name }}
           REPO: ${{ github.repository }}
         run: |
-          url="https://cdn.jsdelivr.net/gh/${REPO}@${TAG}/${BUNDLE}"
-          notes=$(printf 'Bundle for the loader userscript:\n\n```\n// @require      %s\n```\n' "$url")
+          install="https://github.com/${REPO}/releases/latest/download/cardmarket-helper.user.js"
+          notes=$(printf '**Install / update:** open %s with Tampermonkey installed.\n\nAlready installed? Tampermonkey picks this version up by itself at its next update check (you can also trigger a check from its dashboard).\n' "$install")
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$BUNDLE" --clobber
+            gh release upload "$TAG" "$BUNDLE" "$META" --clobber
           else
-            gh release create "$TAG" "$BUNDLE" --title "$TAG" --notes "$notes"
+            gh release create "$TAG" "$BUNDLE" "$META" --title "$TAG" --notes "$notes" --generate-notes --latest
           fi

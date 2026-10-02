@@ -191,4 +191,20 @@ input.control { width: 80px; }
 .dl-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--cmh-border); border-radius: 8px; }
 .dl-item .grow { flex: 1; min-width: 0; }
 .dl-item .fname { font-weight: 600; word-break: break-all; }
+
+/* ---------- settings ---------- */
+.settings { display: flex; flex-direction: column; gap: 4px; }
+.settings-section { padding: 12px 0; border-top: 1px solid var(--cmh-border); }
+.settings-section:first-of-type { border-top: none; }
+.settings-section h3 { margin: 0 0 10px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--cmh-fg-muted); }
+.settings-section summary { cursor: pointer; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--cmh-fg-muted); }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field .control { width: 100%; }
+.field-hint { font-size: 11px; color: var(--cmh-fg-muted); }
+.toggles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 16px; }
+.toggle { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+.toggle input { width: 16px; height: 16px; accent-color: var(--cmh-accent); }
+textarea.control { height: auto; padding: 6px 8px; resize: vertical; }
+textarea.code { font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.modal-sub a { color: var(--cmh-accent); }
 `;

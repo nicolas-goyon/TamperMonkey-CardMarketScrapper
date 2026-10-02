@@ -1,11 +1,11 @@
 /**
- * Root barrel, bundled by esbuild -> dist/cardmarket-helper.js and exposed as
- * window.CardmarketHelper (see scripts/build.mjs). The loader userscript
- * (examples/cardmarket-helper.user.js, or cardmarket_helper/userscripts/) @requires the bundle and calls
- * init({ ...config }) — that config object is the only thing a user edits.
+ * Plugin API. The userscript entry point is src/main.ts, which calls
+ * init(loadUserConfig()) — the configuration lives in Tampermonkey storage and
+ * is edited from the ⚙ Settings panel, so the script itself can auto-update.
+ * Also exposed as window.CardmarketHelper (handy for debugging/tests).
  *
  * Layout: core/ (Tampermonkey + CardMarket glue, no UI), ui/ (shadow-DOM UI
- * kit: launcher, job panel, modal, toasts), features/ (one module per tool).
+ * kit: launcher, job panel, modal, toasts, settings), features/ (one module per tool).
  */
 import { CardmarketHelperConfig, resolveConfig } from './config';
 import { registerMenuCommand } from './core/gm';
@@ -14,7 +14,8 @@ import { setupCartExporter } from './features/cartExporter';
 import { setupCartFiller } from './features/cartFiller';
 import { setupOffersScraper } from './features/offersScraper';
 import { setupWishlistExporter } from './features/wishlistExporter';
-import { installLauncher, toggleMenu } from './ui/launcher';
+import { addAction, installLauncher, toggleMenu } from './ui/launcher';
+import { openSettings } from './ui/settingsModal';
 import { mountUI } from './ui/root';
 
 export type { CardmarketHelperConfig } from './config';
@@ -34,6 +35,15 @@ export function init(userConfig: CardmarketHelperConfig = {}): void {
     mountUI(config);
     installLauncher(version);
     registerMenuCommand('Open CardMarket Helper', () => toggleMenu(true));
+    registerMenuCommand('Settings', () => openSettings(version));
+    addAction({
+      id: 'settings',
+      section: 'Tools',
+      icon: '⚙️',
+      label: 'Settings',
+      description: 'Seller country, speed, enabled tools, button position…',
+      run: () => openSettings(version),
+    });
 
     const setups: Array<[keyof typeof config.features, () => void]> = [
       ['wishlistExporter', () => setupWishlistExporter()],

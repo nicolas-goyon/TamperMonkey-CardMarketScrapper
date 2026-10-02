@@ -80,7 +80,8 @@ function renderMenu(): void {
   if (!menuEl) return;
   const sections: Array<LauncherAction['section']> = ['This page', 'Tools'];
   const blocks = sections.map((section) => {
-    const list = actions.filter((a) => a.section === section);
+    // Settings always last
+    const list = actions.filter((a) => a.section === section).sort((a, b) => Number(a.id === 'settings') - Number(b.id === 'settings'));
     if (list.length === 0 && section === 'This page') {
       return [h('div', { class: 'menu-section' }, section),
         h('div', { class: 'menu-empty' }, 'Nothing to do here. Open a wishlist (Wants) or your shopping cart to export it.')];

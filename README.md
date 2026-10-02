@@ -9,33 +9,25 @@ Browser side of [cardmarket_helper](https://gitlab.com/Nagatwin/cardmarket_helpe
 | Shopping-cart exporter | Shopping cart | Downloads `shopping_cart_<timestamp>.json` for `merge_and_report.py` / the web app's cart comparison |
 | Cart filler | Seller Singles pages | Started by the optimizer report's **🛒 Add to Cart** buttons; adds the exact selected offers to the cart |
 
-Everything is reached from a single **CM Helper** button in a corner of the page (also in the Tampermonkey menu). Long runs show a progress card with ETA and a Stop button; messages are toasts instead of `alert()`s; the UI follows CardMarket's light/dark theme and lives in a shadow DOM.
+It installs and **updates itself** from this repository's GitHub releases. Everything is reached from a single **CM Helper** button in a corner of the page (also in the Tampermonkey menu). Long runs show a progress card with ETA and a Stop button; messages are toasts instead of `alert()`s; the UI follows CardMarket's light/dark theme and lives in a shadow DOM.
 
 ## Install
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/).
-2. Open [`examples/cardmarket-helper.user.js`](examples/cardmarket-helper.user.js) (raw) → **Install** — or Tampermonkey → *Create a new script* and paste it.
-3. Set the `@require` tag to the latest [release](../../releases) (e.g. `@v1.0.3`) and adjust the `init({ ... })` config. That loader is the only thing you ever edit.
+2. Open **[https://github.com/nicolas-goyon/TamperMonkey-CardMarketScrapper/releases/latest/download/cardmarket-helper.user.js](https://github.com/nicolas-goyon/TamperMonkey-CardMarketScrapper/releases/latest/download/cardmarket-helper.user.js)** → Tampermonkey shows its install page → **Install**.
+3. On cardmarket.com, **CM Helper → ⚙ Settings** (also in the Tampermonkey menu): seller country, scraper/cart-filler speed, enabled tools, button corner, theme… Saved in Tampermonkey's storage, applied on the next page load (*Save & reload*).
 
-The bundle is served by jsDelivr from the release tags:
-
-```
-https://cdn.jsdelivr.net/gh/nicolas-goyon/TamperMonkey-CardMarketScrapper@vX.Y.Z/dist/cardmarket-helper.js
-```
-
-Always pin an exact tag: jsDelivr caches branches and version ranges for days. Each GitHub Release lists its exact `@require` line.
-
-Several setups side by side (e.g. a safe and a fast scraper)? Install the loader twice with different `@name`/`@namespace` and configs — they share the same bundle.
+**Updates are automatic.** The script's `@updateURL` points at `cardmarket-helper.meta.js` of the latest GitHub release; Tampermonkey checks it periodically and installs any higher `@version` (to update right away: Tampermonkey dashboard → the script → check for updates). Your settings are not in the script file, so updates never touch them.
 
 ## Releases (CI)
 
-`.github/workflows/release.yml`, same pattern as [Tampermonkey-MultiFile-Plugin-Template](https://github.com/nicolas-goyon/Tampermonkey-MultiFile-Plugin-Template):
+`.github/workflows/release.yml`:
 
-- Every push to `main` that touches `src/`, `package.json`/`package-lock.json`, `tsconfig.json` or `scripts/` typechecks, builds and publishes the next tag:
-  - very first release: the `version` of `package.json` (`v1.0.0`);
+- Every push to `main` that touches `src/`, `package.json`/`package-lock.json`, `tsconfig.json` or `scripts/` typechecks, builds and publishes the next version:
+  - very first release: the `version` of `package.json`;
   - then a **patch** bump by default, `[minor]` / `[major]` in a commit message for bigger bumps, `[skip release]` to publish nothing.
-- The tag points at a CI-only commit that adds `dist/` (`main` never contains build output — `dist/` is git-ignored). The version is stamped into the bundle banner and the CM Helper menu.
-- A GitHub Release is created with the bundle attached and the `@require` line to use.
+- The version is stamped into the userscript header (`@version`), which is what Tampermonkey compares to decide to update.
+- A GitHub Release is created with `cardmarket-helper.user.js` (the script) and `cardmarket-helper.meta.js` (header only, polled by Tampermonkey) attached; it becomes the *latest* release that the install/update URLs point to. The tag also gets a CI-only commit containing `dist/`.
 - Pull requests to `main` are typechecked and built, nothing is published.
 - Manual run (Actions → *Run workflow*): cut a release with a chosen bump, or rebuild an existing tag in place.
 
@@ -44,18 +36,20 @@ Several setups side by side (e.g. a safe and a fast scraper)? Install the loader
 ```bash
 npm ci
 npm run typecheck     # tsc --noEmit
-npm run build         # -> dist/cardmarket-helper.js (git-ignored)
+npm run build         # -> dist/cardmarket-helper.user.js + .meta.js
 npm run build:watch   # rebuild on change (inline source map)
 ```
 
-To try local changes without releasing: enable *Allow access to file URLs* for Tampermonkey in the browser's extension settings and point the loader's `@require` at `file:///…/dist/cardmarket-helper.js`.
+To try local changes without releasing: disable the installed script, then create a new Tampermonkey script from `dist/cardmarket-helper.user.js` (or drag the file into the browser). Settings are per script in Tampermonkey storage, so the dev copy starts with defaults.
 
 ### Layout
 
 ```
 src/
+  main.ts                userscript entry: init(loadUserConfig())
   index.ts               init(config): mounts the UI, starts each enabled feature
   config.ts              Config type, defaults, speed presets (resolveConfig)
+  settings.ts            user config in Tampermonkey storage (load/save/reset)
   global.d.ts            GM_* / unsafeWindow / __VERSION__ declarations
   core/                  No UI
     gm.ts                GM storage + menu wrappers (localStorage fallback outside Tampermonkey)
@@ -67,14 +61,14 @@ src/
     dom.ts               h() element builder (text is never parsed as HTML)
     launcher.ts          CM Helper button + action menu (features call addAction)
     jobPanel.ts          Progress card for long runs (showJob/hideJob)
+    settingsModal.ts     ⚙ Settings panel
     modal.ts, toast.ts
   features/
     wishlistExporter.ts
     cartExporter.ts
     cartFiller.ts        #cmcartfill payload — contract with cardmarket_helper (build_cart_fill_url, webapp app.js)
     offersScraper/       index (file picker), recapModal, merge, runner (page-to-page state machine), parse, types
-examples/
-  cardmarket-helper.user.js   the loader users install (config only)
+scripts/build.mjs        esbuild bundle + ==UserScript== header (@version, @updateURL/@downloadURL)
 ```
 
 ### Contracts with cardmarket_helper
@@ -85,4 +79,4 @@ examples/
 
 ### Adding a tool
 
-Create `src/features/<tool>.ts` exporting `setup<Tool>(config)`, register its launcher entry with `addAction({...})`, use `showJob()` for progress, `toast()` for messages, `openModal()` for dialogs; add a `features.<tool>` flag in `config.ts`, call it from `index.ts`, and document the option in `examples/cardmarket-helper.user.js`.
+Create `src/features/<tool>.ts` exporting `setup<Tool>(config)`, register its launcher entry with `addAction({...})`, use `showJob()` for progress, `toast()` for messages, `openModal()` for dialogs; add a `features.<tool>` flag in `config.ts` (+ `DEFAULT_USER_CONFIG`), call it from `index.ts`, and add the toggle to `ui/settingsModal.ts`. A new `@grant` goes in the header in `scripts/build.mjs` (Tampermonkey asks the user to approve it on update).

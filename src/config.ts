@@ -68,6 +68,15 @@ export interface CardmarketHelperConfig {
   debug?: boolean;
 }
 
+/** What the settings panel shows when nothing was saved yet (= resolveConfig({}) defaults). */
+export const DEFAULT_USER_CONFIG: Required<Pick<CardmarketHelperConfig, 'features' | 'scraper' | 'cartFiller' | 'ui' | 'debug'>> = {
+  features: { wishlistExporter: true, offersScraper: true, cartExporter: true, cartFiller: true },
+  scraper: { sellerCountry: 12, expansionBatchSize: 5, speed: 'balanced', autoDownloadEvery: 5 },
+  cartFiller: { speed: 'balanced' },
+  ui: { position: 'bottom-right', theme: 'auto', offset: { x: 0, y: 0 } },
+  debug: false,
+};
+
 export interface ResolvedConfig {
   features: Required<NonNullable<CardmarketHelperConfig['features']>>;
   scraper: {
