@@ -1,6 +1,5 @@
 # CardMarket Helper — Tampermonkey plugin
 
-Browser side of [cardmarket_helper](https://gitlab.com/Nagatwin/cardmarket_helper) (the Gurobi purchase optimizer): all the CardMarket tools in **one** Tampermonkey script.
 
 | Tool | Where | What it does |
 |---|---|---|
