@@ -1,6 +1,6 @@
 {
   "name": "cardmarket-helper-userscript",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "CardMarket Helper Tampermonkey plugin: wishlist exporter, offers scraper, shopping-cart exporter and cart filler bundled into one script, configured from a tiny loader userscript.",
   "type": "module",
