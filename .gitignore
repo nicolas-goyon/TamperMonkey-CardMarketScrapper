@@ -1,0 +1,3 @@
+node_modules/
+# dist/ IS committed: the loader userscript @requires dist/cardmarket-helper.js
+# straight from the repository. Rebuild it (npm run build) before committing.
