@@ -1,0 +1,202 @@
+name: Build & publish bundle (jsDelivr)
+
+# Builds the Tampermonkey bundle and publishes it on a `vX.Y.Z` tag, so
+# jsDelivr serves a frozen artifact:
+#   https://cdn.jsdelivr.net/gh/<owner>/<repo>@vX.Y.Z/dist/cardmarket-helper.js
+#
+# Release flow (fully automatic):
+#   1. Push to main touching src/, package.json/lock, tsconfig.json or scripts/.
+#      CI picks the next version itself:
+#        - first release ever: the version in package.json (e.g. v1.0.0)
+#        - default: patch bump (vX.Y.Z -> vX.Y.Z+1)
+#        - a pushed commit message contains "[minor]" -> minor bump
+#        - a pushed commit message contains "[major]" -> major bump ([major] wins)
+#        - a pushed commit message contains "[skip release]" -> no release
+#   2. CI typechecks, stamps the version into the bundle, builds, commits dist/
+#      onto a detached commit and pushes the tag pointing at it. main itself
+#      never carries build output (dist/ is git-ignored there).
+#   3. A GitHub Release with the bundle attached is created for the tag.
+#
+# Manual escape hatches (Actions tab → Run workflow):
+#   - "tag" empty, optional "bump"  -> cut a release like an automatic push
+#   - "tag" = an existing vX.Y.Z    -> rebuild that tag in place (broken CDN cache…)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'scripts/**'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to rebuild in place, e.g. v1.0.0 (leave empty to cut a new release)'
+        required: false
+      bump:
+        description: 'Version bump for a new release (ignored if "tag" is set)'
+        required: false
+        type: choice
+        default: patch
+        options: [patch, minor, major]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BUNDLE: dist/cardmarket-helper.js
+
+jobs:
+  # Pull requests: typecheck + build only, nothing is published
+  check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: test -s "$BUNDLE"
+
+  release:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Resolve the release tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          INPUT_BUMP: ${{ github.event.inputs.bump }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          latest_tag() { git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n1; }
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${INPUT_TAG:-}" ]; then
+            echo "name=${INPUT_TAG}" >> "$GITHUB_OUTPUT"
+            echo "rebuild=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            bump="${INPUT_BUMP:-patch}"
+            messages=""
+          else
+            zero_sha="0000000000000000000000000000000000000000"
+            if [ -z "${BEFORE_SHA:-}" ] || [ "${BEFORE_SHA}" = "$zero_sha" ] || ! git cat-file -e "${BEFORE_SHA}" 2>/dev/null; then
+              messages="$(git log -1 --pretty=%B "$AFTER_SHA")"
+            else
+              messages="$(git log --pretty=%B "${BEFORE_SHA}..${AFTER_SHA}")"
+            fi
+            if grep -qi '\[skip release\]' <<< "$messages"; then
+              echo "Commit asked for [skip release]."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if grep -qi '\[major\]' <<< "$messages"; then bump=major
+            elif grep -qi '\[minor\]' <<< "$messages"; then bump=minor
+            else bump=patch; fi
+          fi
+
+          latest="$(latest_tag)"
+          if [ -z "$latest" ]; then
+            # First release: use package.json's version as-is
+            new_tag="v$(node -p "require('./package.json').version")"
+          else
+            IFS='.' read -r major minor patch <<< "${latest#v}"
+            case "$bump" in
+              major) major=$((major + 1)); minor=0; patch=0 ;;
+              minor) minor=$((minor + 1)); patch=0 ;;
+              *)     patch=$((patch + 1)) ;;
+            esac
+            new_tag="v${major}.${minor}.${patch}"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/${new_tag}" >/dev/null; then
+            echo "::error::Tag ${new_tag} already exists — refusing to overwrite it. Rebuild it explicitly via workflow_dispatch if that's intended."
+            exit 1
+          fi
+          echo "Releasing ${new_tag} (bump: ${bump})"
+          echo "name=${new_tag}" >> "$GITHUB_OUTPUT"
+          echo "rebuild=false" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout the existing tag
+        if: steps.tag.outputs.rebuild == 'true'
+        run: git checkout "${{ steps.tag.outputs.name }}"
+
+      - name: Setup Node
+        if: steps.tag.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.tag.outputs.skip != 'true'
+        run: npm ci
+
+      - name: Typecheck
+        if: steps.tag.outputs.skip != 'true'
+        run: npm run typecheck
+
+      - name: Build (version stamped from the tag)
+        if: steps.tag.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          npm version "${TAG#v}" --no-git-tag-version --allow-same-version
+          npm run build
+          test -s "$BUNDLE" || { echo "::error::$BUNDLE missing or empty"; exit 1; }
+          grep -q "CardMarket Helper ${TAG}" "$BUNDLE" || { echo "::error::version banner missing in $BUNDLE"; exit 1; }
+          echo "OK: $BUNDLE ($(wc -c < "$BUNDLE") bytes)"
+
+      - name: Commit dist/ and push the tag
+        if: steps.tag.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f dist/ package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "Nothing changed in dist/ — tagging the current commit."
+          else
+            git commit -m "ci(build): dist for ${TAG}"
+          fi
+          git tag -f "${TAG}"
+          git push origin "${TAG}" --force
+
+      - name: GitHub Release
+        if: steps.tag.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.name }}
+          REPO: ${{ github.repository }}
+        run: |
+          url="https://cdn.jsdelivr.net/gh/${REPO}@${TAG}/${BUNDLE}"
+          notes=$(printf 'Bundle for the loader userscript:\n\n```\n// @require      %s\n```\n' "$url")
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$BUNDLE" --clobber
+          else
+            gh release create "$TAG" "$BUNDLE" --title "$TAG" --notes "$notes"
+          fi

@@ -9,7 +9,7 @@ const watch = process.argv.includes('--watch');
 const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 
 // Single bundle regrouping the whole plugin. The loader userscript
-// (../userscripts/cardmarket-helper.user.js) @requires it and calls
+// (examples/cardmarket-helper.user.js) @requires it and calls
 // window.CardmarketHelper.init({ ...config }).
 const entry = {
   in: path.join(root, 'src', 'index.ts'),
@@ -30,7 +30,7 @@ const options = {
   globalName: entry.globalName,
   define: { __VERSION__: JSON.stringify(pkg.version) },
   banner: {
-    js: `/*! CardMarket Helper v${pkg.version} — built bundle, do not edit: edit tampermonkey/src/ and run "npm run build". */`,
+    js: `/*! CardMarket Helper v${pkg.version} — built bundle, do not edit — https://github.com/nicolas-goyon/TamperMonkey-CardMarketScrapper */`,
   },
   // Inside the Tampermonkey sandbox (any @grant != none), the top-level
   // `var CardmarketHelper` of the IIFE bundle stays local to the wrapper:

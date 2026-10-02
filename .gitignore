@@ -1,3 +1,10 @@
 node_modules/
-# dist/ IS committed: the loader userscript @requires dist/cardmarket-helper.js
-# straight from the repository. Rebuild it (npm run build) before committing.
+*.tsbuildinfo
+*.log
+.DS_Store
+Thumbs.db
+
+# dist/ is rebuilt locally with `npm run build` and isn't tracked on main.
+# The release workflow (.github/workflows/release.yml) force-adds it onto its
+# own tag commit, so jsDelivr serves it from each vX.Y.Z tag — main itself
+# never carries build output.

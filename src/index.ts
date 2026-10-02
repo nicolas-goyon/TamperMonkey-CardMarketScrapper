@@ -1,7 +1,7 @@
 /**
  * Root barrel, bundled by esbuild -> dist/cardmarket-helper.js and exposed as
  * window.CardmarketHelper (see scripts/build.mjs). The loader userscript
- * (userscripts/cardmarket-helper.user.js) @requires the bundle and calls
+ * (examples/cardmarket-helper.user.js, or cardmarket_helper/userscripts/) @requires the bundle and calls
  * init({ ...config }) — that config object is the only thing a user edits.
  *
  * Layout: core/ (Tampermonkey + CardMarket glue, no UI), ui/ (shadow-DOM UI
