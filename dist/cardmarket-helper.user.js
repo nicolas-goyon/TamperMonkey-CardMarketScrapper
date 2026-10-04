@@ -794,15 +794,24 @@ textarea.code { font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace
     if (!match) throw new Error(`Could not parse quantity from: ${cell.textContent}`);
     return parseInt(match[1], 10);
   }
+  function sellerBlocks() {
+    const cartSections = Array.from(document.querySelectorAll('section[id^="seller"]'));
+    if (cartSections.length > 0) return cartSections.map((s) => ({ root: s, data: s }));
+    return Array.from(document.querySelectorAll("div.shipment-block")).map((block) => ({
+      root: block,
+      // A shipment block without its summary fails below with a clear message
+      data: block.querySelector("div.summary[data-article-count]") ?? block
+    }));
+  }
   function extractCart() {
     const cards = [];
     let failedRows = 0;
     let failedSellers = 0;
-    document.querySelectorAll('section[id^="seller"]').forEach((section) => {
+    sellerBlocks().forEach(({ root: section, data }) => {
       try {
         const seller = section.querySelector('a[href*="/Users/"]')?.textContent?.trim();
         if (!seller) throw new Error("Could not extract seller name from section");
-        const ds = section.dataset;
+        const ds = data.dataset;
         const articleCount = parseInt(ds.articleCount ?? "", 10);
         const itemValue = parseFloat(ds.itemValue ?? "");
         const shipping = parseFloat(ds.shipCost || ds.shippingPrice || "");
@@ -810,7 +819,7 @@ textarea.code { font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace
         if ([articleCount, itemValue, shipping, trust].some(isNaN)) {
           throw new Error(`Missing or invalid seller data attributes for seller: ${seller}`);
         }
-        const table = section.querySelector("table.article-table");
+        const table = section.querySelector("table.article-table, table.product-table");
         if (!table) throw new Error(`No article table found for seller: ${seller}`);
         const rows = Array.from(table.querySelectorAll("tr[data-article-id]"));
         const totalCards2 = rows.reduce((sum, r) => sum + quantityOf(r), 0);
@@ -853,12 +862,22 @@ textarea.code { font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace
     });
     return { cards, failedRows, failedSellers };
   }
+  function isCheckoutSuccess() {
+    return /\/ShoppingCart\/Checkout\/Success/.test(window.location.pathname);
+  }
   function exportCart() {
-    if (ensureEnglishForExport(RESUME_FLAG)) return;
+    if (isCheckoutSuccess()) {
+      if (!isEnglishVersion()) {
+        toast("error", "The checkout page can only be exported in English. Next time, switch the site to English before checking out \u2014 or export the cart before paying.");
+        return;
+      }
+    } else if (ensureEnglishForExport(RESUME_FLAG)) {
+      return;
+    }
     try {
       const { cards, failedRows, failedSellers } = extractCart();
       if (cards.length === 0) {
-        toast("error", "No cards found in the shopping cart.");
+        toast("error", isCheckoutSuccess() ? "No cards found on this checkout page." : "No cards found in the shopping cart.");
         return;
       }
       const sum = (f) => cards.reduce((s, c) => s + f(c), 0);
@@ -895,7 +914,7 @@ ${filename}`, { title: "Shopping cart exported" });
       section: "This page",
       icon: "\u{1F9FE}",
       label: "Export shopping cart",
-      description: "Download it as JSON to compare with the optimizer report",
+      description: isCheckoutSuccess() ? "Download the purchased shipments as cart JSON to compare with the optimizer report" : "Download it as JSON to compare with the optimizer report",
       run: exportCart
     });
     if (takeResumeFlag(RESUME_FLAG)) {
